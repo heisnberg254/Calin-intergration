@@ -56,7 +56,7 @@
   },
   {
    "fieldname": "site",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Site",
    "options": "Site"
   },

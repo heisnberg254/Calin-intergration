@@ -278,8 +278,8 @@ def sync_all_token_records():
             doc.insert(ignore_permissions=True)
             created += 1
         else:
-            frappe.db.set_value("Token Record", receipt_id, fields)
-            updated += 1
+            skipped += 1
+            continue
 
     frappe.db.commit()
     frappe.msgprint(f"Token Record sync complete: {created} created, {updated} updated, {skipped} skipped")
