@@ -8,6 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "house_number",
+  "calin_customer_id",
+  "site",
   "customer",
   "status",
   "column_break_thiy",
@@ -23,6 +25,20 @@
    "in_list_view": 1,
    "label": "House Number",
    "unique": 1
+  },
+  {
+   "fieldname": "calin_customer_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Calin Customer ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "site",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Site",
+   "read_only": 1
   },
   {
    "fieldname": "customer",

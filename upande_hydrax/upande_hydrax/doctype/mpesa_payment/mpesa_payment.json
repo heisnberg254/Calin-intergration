@@ -1,0 +1,179 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "field:transaction_id",
+ "creation": "2026-09-11 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "bill_ref_number",
+  "transaction_amount",
+  "phone_number",
+  "first_name",
+  "middle_name",
+  "last_name",
+  "column_break_ynwa",
+  "transaction_id",
+  "transaction_type",
+  "transaction_time",
+  "business_short_code",
+  "third_party_transaction_id",
+  "invoice_number",
+  "org_account_balance",
+  "section_break_link",
+  "house",
+  "water_meter",
+  "token_record",
+  "column_break_status",
+  "status",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "bill_ref_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bill Ref Number"
+  },
+  {
+   "fieldname": "transaction_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Transaction Amount"
+  },
+  {
+   "fieldname": "phone_number",
+   "fieldtype": "Data",
+   "label": "Phone Number"
+  },
+  {
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "label": "First Name"
+  },
+  {
+   "fieldname": "middle_name",
+   "fieldtype": "Data",
+   "label": "Middle Name"
+  },
+  {
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "label": "Last Name"
+  },
+  {
+   "fieldname": "column_break_ynwa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "transaction_id",
+   "fieldtype": "Data",
+   "label": "Transaction ID",
+   "unique": 1
+  },
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Data",
+   "label": "Transaction Type"
+  },
+  {
+   "fieldname": "transaction_time",
+   "fieldtype": "Datetime",
+   "label": "Transaction Time"
+  },
+  {
+   "fieldname": "business_short_code",
+   "fieldtype": "Data",
+   "label": "Business Short Code"
+  },
+  {
+   "fieldname": "third_party_transaction_id",
+   "fieldtype": "Data",
+   "label": "Third Party Transaction ID"
+  },
+  {
+   "fieldname": "invoice_number",
+   "fieldtype": "Data",
+   "label": "Invoice Number"
+  },
+  {
+   "fieldname": "org_account_balance",
+   "fieldtype": "Currency",
+   "label": "Org Account Balance"
+  },
+  {
+   "collapsible": 0,
+   "fieldname": "section_break_link",
+   "fieldtype": "Section Break",
+   "label": "Matching"
+  },
+  {
+   "fieldname": "house",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "House",
+   "options": "House"
+  },
+  {
+   "fieldname": "water_meter",
+   "fieldtype": "Link",
+   "label": "Water Meter",
+   "options": "Water Meter"
+  },
+  {
+   "fieldname": "token_record",
+   "fieldtype": "Link",
+   "label": "Token Record",
+   "options": "Token Record"
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nMatched\nUnmatched\nCredited\nFailed"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-11 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Hydrax",
+ "name": "Mpesa Payment",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "bill_ref_number"
+}

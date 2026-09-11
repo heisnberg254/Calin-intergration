@@ -10,11 +10,13 @@ class House(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
+        calin_customer_id: DF.Data | None
         customer: DF.Link | None
         geolocation_dvks: DF.Geolocation | None
         house_number: DF.Data | None
         latitude: DF.Data | None
         longitude: DF.Data | None
+        site: DF.Data | None
         status: DF.Literal["Active", "Inactive", "Suspended"]
     # end: auto-generated types
 
