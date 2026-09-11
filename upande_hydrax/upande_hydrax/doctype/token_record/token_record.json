@@ -8,6 +8,11 @@
  "engine": "InnoDB",
  "field_order": [
   "meter",
+  "customer_id",
+  "customer_name",
+  "tariff_id",
+  "created_date",
+  "updated_dat",
   "receipt_id",
   "amount_paid",
   "token",
@@ -19,7 +24,8 @@
   "closing_balance",
   "mpesa_receipt_number",
   "is_preview",
-  "type"
+  "type",
+  "remark"
  ],
  "fields": [
   {
@@ -95,12 +101,45 @@
    "fieldname": "total_unit",
    "fieldtype": "Float",
    "label": "Total Unit"
+  },
+  {
+   "fieldname": "customer_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer ID"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "tariff_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tariff ID"
+  },
+  {
+   "fieldname": "created_date",
+   "fieldtype": "Datetime",
+   "label": "Created Date"
+  },
+  {
+   "fieldname": "updated_dat",
+   "fieldtype": "Datetime",
+   "label": "Updated Date"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-14 19:33:09.607107",
+ "modified": "2026-09-10 08:52:19.330141",
  "modified_by": "Administrator",
  "module": "Upande Hydrax",
  "name": "Token Record",
