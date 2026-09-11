@@ -5,10 +5,14 @@ import frappe
 def get_dashboard_summary():
     total_dcu = frappe.db.count("DCU")
     online_dcu = frappe.db.count("DCU", {"status": "Online"})
+    offline_dcu = total_dcu - online_dcu
     total_meters = frappe.db.count("Water Meter")
+    faulty_meters = frappe.db.count("Water Meter", {"status": "Faulty"})
 
     today = frappe.utils.nowdate()
     yesterday = frappe.utils.add_days(today, -1)
+    month_start = frappe.utils.get_first_day(today)
+
     active_meters = frappe.db.sql("""
         SELECT COUNT(DISTINCT meter) FROM `tabMeter Reading`
         WHERE DATE(reading_date) >= %s
@@ -30,12 +34,24 @@ def get_dashboard_summary():
             AND prev.cumulative_reading IS NOT NULL AND prev.cumulative_reading != -1
     """, (today,))[0][0] or 0
 
+    revenue_today = frappe.db.sql("""
+        SELECT SUM(amount_paid) FROM `tabToken Record` WHERE DATE(created_date) = %s
+    """, (today,))[0][0] or 0
+
+    revenue_month = frappe.db.sql("""
+        SELECT SUM(amount_paid) FROM `tabToken Record` WHERE DATE(created_date) >= %s
+    """, (month_start,))[0][0] or 0
+
     return {
         "total_dcu": total_dcu,
         "online_dcu": online_dcu,
+        "offline_dcu": offline_dcu,
         "total_meters": total_meters,
+        "faulty_meters": faulty_meters,
         "active_meters": active_meters,
-        "total_consumption_today": round(total_consumption_today, 1)
+        "total_consumption_today": round(total_consumption_today, 1),
+        "revenue_today": round(revenue_today, 2),
+        "revenue_month": round(revenue_month, 2)
     }
 
 
@@ -48,8 +64,8 @@ def get_map_points(site: str = None):
     )
     dcus = [
         d for d in dcus_raw
-        if str(d.get("latitude")).replace("\u00b0", "").strip() not in ("0", "0.0", "")
-        and str(d.get("longitude")).replace("\u00b0", "").strip() not in ("0", "0.0", "")
+        if str(d.get("latitude")).replace("°", "").strip() not in ("0", "0.0", "")
+        and str(d.get("longitude")).replace("°", "").strip() not in ("0", "0.0", "")
     ]
 
     meter_filters = {"latitude": ["is", "set"], "longitude": ["is", "set"]}
@@ -58,7 +74,7 @@ def get_map_points(site: str = None):
 
     meters_raw = frappe.db.get_all(
         "Water Meter",
-        fields=["meter_id", "latitude", "longitude", "house_number", "site"],
+        fields=["meter_id", "latitude", "longitude", "house_number", "site", "status"],
         filters=meter_filters
     )
     meters = [
@@ -72,17 +88,28 @@ def get_map_points(site: str = None):
 
 @frappe.whitelist()
 def get_site_list():
-    return frappe.db.get_all("Site", fields=["name"], order_by="name asc")
+    return frappe.db.sql("""
+        SELECT DISTINCT site FROM `tabWater Meter`
+        WHERE site IS NOT NULL AND site != ''
+        ORDER BY site ASC
+    """, as_dict=True)
 
 
 @frappe.whitelist()
-def get_consumption_by_meter():
+def get_site_breakdown():
     today = frappe.utils.nowdate()
-    data = frappe.db.sql("""
-        SELECT
-            curr.meter,
-            curr.cumulative_reading - prev.cumulative_reading AS consumption
+
+    meter_counts = frappe.db.sql("""
+        SELECT COALESCE(NULLIF(site, ''), 'Unassigned') AS site, COUNT(*) AS meter_count
+        FROM `tabWater Meter`
+        GROUP BY COALESCE(NULLIF(site, ''), 'Unassigned')
+    """, as_dict=True)
+
+    consumption = frappe.db.sql("""
+        SELECT COALESCE(NULLIF(wm.site, ''), 'Unassigned') AS site,
+            SUM(curr.cumulative_reading - prev.cumulative_reading) AS consumption_today
         FROM `tabMeter Reading` curr
+        JOIN `tabWater Meter` wm ON wm.name = curr.meter
         LEFT JOIN `tabMeter Reading` prev
             ON prev.meter = curr.meter
             AND prev.reading_date = (
@@ -94,9 +121,119 @@ def get_consumption_by_meter():
         WHERE DATE(curr.reading_date) = %s
             AND curr.cumulative_reading IS NOT NULL AND curr.cumulative_reading != -1
             AND prev.cumulative_reading IS NOT NULL AND prev.cumulative_reading != -1
+        GROUP BY COALESCE(NULLIF(wm.site, ''), 'Unassigned')
     """, (today,), as_dict=True)
 
+    revenue = frappe.db.sql("""
+        SELECT COALESCE(NULLIF(wm.site, ''), 'Unassigned') AS site,
+            SUM(tr.amount_paid) AS revenue_today
+        FROM `tabToken Record` tr
+        JOIN `tabWater Meter` wm ON wm.name = tr.meter
+        WHERE DATE(tr.created_date) = %s
+        GROUP BY COALESCE(NULLIF(wm.site, ''), 'Unassigned')
+    """, (today,), as_dict=True)
+
+    merged = {}
+    for row in meter_counts:
+        merged[row.site] = {
+            "site": row.site,
+            "meter_count": row.meter_count,
+            "consumption_today": 0,
+            "revenue_today": 0
+        }
+    for row in consumption:
+        merged.setdefault(row.site, {"site": row.site, "meter_count": 0, "consumption_today": 0, "revenue_today": 0})
+        merged[row.site]["consumption_today"] = round(row.consumption_today or 0, 1)
+    for row in revenue:
+        merged.setdefault(row.site, {"site": row.site, "meter_count": 0, "consumption_today": 0, "revenue_today": 0})
+        merged[row.site]["revenue_today"] = round(row.revenue_today or 0, 2)
+
+    return sorted(merged.values(), key=lambda r: r["meter_count"], reverse=True)
+
+
+@frappe.whitelist()
+def get_consumption_trend(days: int = 14):
+    start_date = frappe.utils.add_days(frappe.utils.nowdate(), -(int(days) - 1))
+    rows = frappe.db.sql("""
+        SELECT DATE(curr.reading_date) AS day,
+            SUM(curr.cumulative_reading - prev.cumulative_reading) AS consumption
+        FROM `tabMeter Reading` curr
+        LEFT JOIN `tabMeter Reading` prev
+            ON prev.meter = curr.meter
+            AND prev.reading_date = (
+                SELECT MAX(r2.reading_date)
+                FROM `tabMeter Reading` r2
+                WHERE r2.meter = curr.meter
+                AND r2.reading_date < curr.reading_date
+            )
+        WHERE DATE(curr.reading_date) >= %s
+            AND curr.cumulative_reading IS NOT NULL AND curr.cumulative_reading != -1
+            AND prev.cumulative_reading IS NOT NULL AND prev.cumulative_reading != -1
+        GROUP BY DATE(curr.reading_date)
+        ORDER BY day ASC
+    """, (start_date,), as_dict=True)
+
     return {
-        "labels": [row["meter"] for row in data],
-        "values": [row["consumption"] or 0 for row in data]
+        "labels": [str(row["day"]) for row in rows],
+        "values": [round(row["consumption"] or 0, 1) for row in rows]
     }
+
+
+@frappe.whitelist()
+def get_revenue_trend(days: int = 14):
+    start_date = frappe.utils.add_days(frappe.utils.nowdate(), -(int(days) - 1))
+    rows = frappe.db.sql("""
+        SELECT DATE(created_date) AS day, SUM(amount_paid) AS revenue
+        FROM `tabToken Record`
+        WHERE created_date IS NOT NULL AND DATE(created_date) >= %s
+        GROUP BY DATE(created_date)
+        ORDER BY day ASC
+    """, (start_date,), as_dict=True)
+
+    return {
+        "labels": [str(row["day"]) for row in rows],
+        "values": [round(row["revenue"] or 0, 2) for row in rows]
+    }
+
+
+@frappe.whitelist()
+def get_recent_token_records(limit: int = 8, token_type: str = None):
+    filters = {"type": token_type} if token_type else {}
+    return frappe.db.get_all(
+        "Token Record",
+        filters=filters,
+        fields=["receipt_id", "customer_name", "meter", "amount_paid", "type", "created_date"],
+        order_by="created_date desc",
+        limit_page_length=int(limit)
+    )
+
+
+@frappe.whitelist()
+def assign_house_number(meter_id: str, house_number: str):
+    house_number = (house_number or "").strip()
+    if not house_number:
+        frappe.throw("House number is required")
+
+    meter = frappe.get_doc("Water Meter", meter_id)
+
+    existing_house = frappe.db.exists("House", {"house_number": house_number})
+    if existing_house and existing_house != meter.house_number:
+        frappe.throw(f"House number '{house_number}' is already assigned to another house")
+
+    if existing_house:
+        house_name = existing_house
+    else:
+        house = frappe.get_doc({
+            "doctype": "House",
+            "house_number": house_number,
+            "calin_customer_id": meter.calin_customer_id,
+            "site": meter.site,
+            "status": "Active"
+        })
+        house.insert()
+        house_name = house.name
+
+    meter.house_number = house_name
+    meter.save()
+
+    return {"house": house_name}

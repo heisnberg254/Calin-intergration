@@ -1,0 +1,39 @@
+{
+ "app": "upande_hydrax",
+ "charts": [],
+ "content": "[{\"id\": \"0e4768cd69\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"Upande Sensors\", \"col\": 12}}]",
+ "custom_blocks": [
+  {
+   "custom_block_name": "Upande Sensors",
+   "label": "Upande Sensors"
+  }
+ ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "external_link": null,
+ "for_user": null,
+ "hide_custom": 0,
+ "icon": "droplet",
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Overview",
+ "link_to": null,
+ "link_type": "DocType",
+ "links": [],
+ "modified": "2026-09-11 01:00:00.000000",
+ "module": "Upande Hydrax",
+ "module_onboarding": null,
+ "name": "Overview",
+ "number_cards": [],
+ "parent_page": "Upande Calin Integration",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": null,
+ "roles": [],
+ "sequence_id": 1.0,
+ "shortcuts": [],
+ "sidebar_items": [],
+ "standard": 0,
+ "title": "Overview",
+ "type": "Workspace"
+}
