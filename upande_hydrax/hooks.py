@@ -4,6 +4,7 @@ app_publisher = "edwin@upande.com"
 app_description = "This is for monitoring the calin water meter"
 app_email = "edwin@upande.com"
 app_license = "mit"
+app_logo_url = "/assets/upande_hydrax/images/hydrax-logo.svg"
 
 # Send non-GET requests for this app's endpoints as native `application/json`
 # bodies instead of form-encoded, per-key JSON-stringified values.
@@ -15,15 +16,14 @@ use_json_request_body = True
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "upande_hydrax",
-# 		"logo": "/assets/upande_hydrax/logo.png",
-# 		"title": "Upande Hydrax",
-# 		"route": "/upande_hydrax",
-# 		"has_permission": "upande_hydrax.api.permission.has_app_permission",
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "upande_hydrax",
+		"logo": app_logo_url,
+		"title": "Upande Calin Integration",
+		"route": "/desk/upande-calin-integration",
+	}
+]
 
 # Companion apps that extend a host app (instead of taking their own apps-screen icon) can pin
 # their workspaces into the host app's workspace dock (rail) with this hook. Declaring it keeps
