@@ -96,62 +96,6 @@ def get_site_list():
 
 
 @frappe.whitelist()
-def get_site_breakdown():
-    today = frappe.utils.nowdate()
-
-    meter_counts = frappe.db.sql("""
-        SELECT COALESCE(NULLIF(site, ''), 'Unassigned') AS site, COUNT(*) AS meter_count
-        FROM `tabWater Meter`
-        GROUP BY COALESCE(NULLIF(site, ''), 'Unassigned')
-    """, as_dict=True)
-
-    consumption = frappe.db.sql("""
-        SELECT COALESCE(NULLIF(wm.site, ''), 'Unassigned') AS site,
-            SUM(curr.cumulative_reading - prev.cumulative_reading) AS consumption_today
-        FROM `tabMeter Reading` curr
-        JOIN `tabWater Meter` wm ON wm.name = curr.meter
-        LEFT JOIN `tabMeter Reading` prev
-            ON prev.meter = curr.meter
-            AND prev.reading_date = (
-                SELECT MAX(r2.reading_date)
-                FROM `tabMeter Reading` r2
-                WHERE r2.meter = curr.meter
-                AND r2.reading_date < curr.reading_date
-            )
-        WHERE DATE(curr.reading_date) = %s
-            AND curr.cumulative_reading IS NOT NULL AND curr.cumulative_reading != -1
-            AND prev.cumulative_reading IS NOT NULL AND prev.cumulative_reading != -1
-        GROUP BY COALESCE(NULLIF(wm.site, ''), 'Unassigned')
-    """, (today,), as_dict=True)
-
-    revenue = frappe.db.sql("""
-        SELECT COALESCE(NULLIF(wm.site, ''), 'Unassigned') AS site,
-            SUM(tr.amount_paid) AS revenue_today
-        FROM `tabToken Record` tr
-        JOIN `tabWater Meter` wm ON wm.name = tr.meter
-        WHERE DATE(tr.created_date) = %s
-        GROUP BY COALESCE(NULLIF(wm.site, ''), 'Unassigned')
-    """, (today,), as_dict=True)
-
-    merged = {}
-    for row in meter_counts:
-        merged[row.site] = {
-            "site": row.site,
-            "meter_count": row.meter_count,
-            "consumption_today": 0,
-            "revenue_today": 0
-        }
-    for row in consumption:
-        merged.setdefault(row.site, {"site": row.site, "meter_count": 0, "consumption_today": 0, "revenue_today": 0})
-        merged[row.site]["consumption_today"] = round(row.consumption_today or 0, 1)
-    for row in revenue:
-        merged.setdefault(row.site, {"site": row.site, "meter_count": 0, "consumption_today": 0, "revenue_today": 0})
-        merged[row.site]["revenue_today"] = round(row.revenue_today or 0, 2)
-
-    return sorted(merged.values(), key=lambda r: r["meter_count"], reverse=True)
-
-
-@frappe.whitelist()
 def get_consumption_trend(days: int = 14):
     start_date = frappe.utils.add_days(frappe.utils.nowdate(), -(int(days) - 1))
     rows = frappe.db.sql("""
@@ -180,15 +124,21 @@ def get_consumption_trend(days: int = 14):
 
 
 @frappe.whitelist()
-def get_revenue_trend(days: int = 14):
+def get_revenue_trend(days: int = 14, token_type: str = None):
     start_date = frappe.utils.add_days(frappe.utils.nowdate(), -(int(days) - 1))
-    rows = frappe.db.sql("""
+    conditions = "created_date IS NOT NULL AND DATE(created_date) >= %s"
+    params = [start_date]
+    if token_type:
+        conditions += " AND type = %s"
+        params.append(token_type)
+
+    rows = frappe.db.sql(f"""
         SELECT DATE(created_date) AS day, SUM(amount_paid) AS revenue
         FROM `tabToken Record`
-        WHERE created_date IS NOT NULL AND DATE(created_date) >= %s
+        WHERE {conditions}
         GROUP BY DATE(created_date)
         ORDER BY day ASC
-    """, (start_date,), as_dict=True)
+    """, params, as_dict=True)
 
     return {
         "labels": [str(row["day"]) for row in rows],
@@ -197,12 +147,21 @@ def get_revenue_trend(days: int = 14):
 
 
 @frappe.whitelist()
-def get_recent_token_records(limit: int = 8, token_type: str = None):
+def get_recent_token_records(limit: int = 10, token_type: str = None, search: str = None):
     filters = {"type": token_type} if token_type else {}
+    or_filters = {}
+    if search:
+        like = f"%{search}%"
+        or_filters = {
+            "customer_name": ["like", like],
+            "meter": ["like", like],
+            "receipt_id": ["like", like]
+        }
     return frappe.db.get_all(
         "Token Record",
         filters=filters,
-        fields=["receipt_id", "customer_name", "meter", "amount_paid", "type", "created_date"],
+        or_filters=or_filters,
+        fields=["receipt_id", "customer_name", "meter", "amount_paid", "token", "type", "created_date"],
         order_by="created_date desc",
         limit_page_length=int(limit)
     )
