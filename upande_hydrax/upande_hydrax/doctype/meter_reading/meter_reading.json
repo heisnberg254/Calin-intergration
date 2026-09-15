@@ -8,10 +8,14 @@
  "engine": "InnoDB",
  "field_order": [
   "meter",
+  "customer_name",
   "reading_date",
+  "updated_date",
   "cumulative_reading",
   "recharge_balance",
+  "total_recharge_balance",
   "concentrator_id",
+  "remark",
   "valve_status",
   "magnetic_interference",
   "battery_status"
@@ -25,9 +29,21 @@
    "options": "Water Meter"
   },
   {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Name"
+  },
+  {
    "fieldname": "reading_date",
    "fieldtype": "Datetime",
    "label": "Reading Date"
+  },
+  {
+   "fieldname": "updated_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Update Date"
   },
   {
    "fieldname": "cumulative_reading",
@@ -40,6 +56,11 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Recharge Balance"
+  },
+  {
+   "fieldname": "total_recharge_balance",
+   "fieldtype": "Float",
+   "label": "Total Recharge  Balance"
   },
   {
    "default": "0",
@@ -66,6 +87,11 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Concentrator ID"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
   }
  ],
  "grid_page_length": 50,

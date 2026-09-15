@@ -17,11 +17,15 @@ class MeterReading(Document):
 		battery_status: DF.Check
 		concentrator_id: DF.Data | None
 		cumulative_reading: DF.Float
+		customer_name: DF.Data | None
 		magnetic_interference: DF.Check
 		meter: DF.Link | None
 		name: DF.Int | None
 		reading_date: DF.Datetime | None
 		recharge_balance: DF.Float
+		remark: DF.SmallText | None
+		total_recharge_balance: DF.Float
+		updated_date: DF.Datetime | None
 		valve_status: DF.Check
 	# end: auto-generated types
 
