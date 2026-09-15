@@ -11,6 +11,7 @@
   "house_number",
   "cumulative_reading",
   "tariff_id",
+  "customer_name",
   "column_break_srfe",
   "token_balance",
   "dcu",
@@ -96,6 +97,7 @@
   {
    "fieldname": "datetime_zrga",
    "fieldtype": "Datetime",
+   "in_list_view": 1,
    "label": "Last Synced"
   },
   {
@@ -118,12 +120,17 @@
    "fieldtype": "Select",
    "label": "Status",
    "options": "Active\nInactive\nFaulty"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-17 11:27:50.790543",
+ "modified": "2026-09-15 09:20:37.007746",
  "modified_by": "Administrator",
  "module": "Upande Hydrax",
  "name": "Water Meter",
