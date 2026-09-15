@@ -15,6 +15,7 @@ class WaterMeter(Document):
 		from frappe.types import DF
 
 		calin_customer_id: DF.Data | None
+		created_date: DF.Date | None
 		cumulative_reading: DF.Float
 		customer_name: DF.Data | None
 		datetime_zrga: DF.Datetime | None
@@ -26,10 +27,12 @@ class WaterMeter(Document):
 		meter_id: DF.Data | None
 		meter_type: DF.Data | None
 		protocol_version: DF.Data | None
+		remark: DF.SmallText | None
 		site: DF.Data | None
 		status: DF.Literal["Active", "Inactive", "Faulty"]
 		tariff_id: DF.Data | None
 		token_balance: DF.Float
+		updated_date: DF.Datetime | None
 	# end: auto-generated types
 
 	_DOCTYPE_NAME = "Water Meter ID"

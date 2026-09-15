@@ -21,6 +21,9 @@
   "meter_type",
   "protocol_version",
   "status",
+  "created_date",
+  "updated_date",
+  "remark",
   "section_break_wawj",
   "geolocation_uhoo",
   "location_section",
@@ -125,6 +128,21 @@
    "fieldname": "customer_name",
    "fieldtype": "Data",
    "label": "Customer Name"
+  },
+  {
+   "fieldname": "created_date",
+   "fieldtype": "Date",
+   "label": "Created Date"
+  },
+  {
+   "fieldname": "updated_date",
+   "fieldtype": "Datetime",
+   "label": "Updated Date"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
   }
  ],
  "grid_page_length": 50,
