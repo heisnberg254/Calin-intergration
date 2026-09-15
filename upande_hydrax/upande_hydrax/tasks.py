@@ -2,27 +2,50 @@ import frappe
 import requests
 
 
+def _fetch_all_pages(url, headers, base_body, log_title, page_size=500):
+    """POST to a Calin `/read` endpoint, following pageNumber until every row
+    reported in result.total has been collected. Returns None (after logging
+    and notifying) if the API reports a non-zero code on any page."""
+    rows = []
+    page_number = 1
+
+    while True:
+        body = {**base_body, "pageNumber": page_number, "pageSize": page_size}
+        response = requests.post(url, json=body, headers=headers, timeout=30)
+        payload = response.json()
+
+        if payload.get("code") != 0:
+            frappe.log_error(payload, log_title)
+            frappe.msgprint(f"Sync failed: {payload.get('reason')}")
+            return None
+
+        page_rows = payload["result"]["data"]
+        rows.extend(page_rows)
+
+        total = payload["result"].get("total") or 0
+        if not page_rows or len(rows) >= total:
+            break
+        page_number += 1
+
+    return rows
+
+
 @frappe.whitelist()
 def sync_all_dcus():
     settings = frappe.get_single("URL Setup Settings")
     headers = {"Authorization": f"Bearer {settings.get_password('api_token')}"}
 
     loc_url = f"{settings.base_url}/api/concentrator/read"
-    loc_body = {
-        "pageNumber": 1, "pageSize": 500, "concentratorId": None, "name": None,
-        "lat": None, "lng": None, "remark": None, "createDateRange": None,
-        "updateDateRange": None, "orderBy": "concentratorId asc", "searchTerm": None,
-        "Company": settings.company
-    }
-    loc_response = requests.post(loc_url, json=loc_body, headers=headers, timeout=30)
-    loc_payload = loc_response.json()
-
-    if loc_payload.get("code") != 0:
-        frappe.log_error(loc_payload, "DCU Location Fetch Failed")
+    loc_rows = _fetch_all_pages(loc_url, headers, {
+        "concentratorId": None, "name": None, "lat": None, "lng": None, "remark": None,
+        "createDateRange": None, "updateDateRange": None, "orderBy": "concentratorId asc",
+        "searchTerm": None, "Company": settings.company
+    }, "DCU Location Fetch Failed")
+    if loc_rows is None:
         return
 
     locations = {}
-    for row in loc_payload["result"]["data"]:
+    for row in loc_rows:
         locations[row["concentratorId"]] = {
             "dcu_name": row.get("name"),
             "latitude": row.get("lat"),
@@ -30,20 +53,15 @@ def sync_all_dcus():
         }
 
     status_url = f"{settings.base_url}/api/concentratorOnlineStatus/read"
-    status_body = {
-        "lang": "en", "pageNumber": 1, "pageSize": 500, "concentratorId": None,
-        "status": None, "remark": None, "orderBy": "concentratorId asc",
-        "searchTerm": None, "Company": settings.company
-    }
-    status_response = requests.post(status_url, json=status_body, headers=headers, timeout=30)
-    status_payload = status_response.json()
-
-    if status_payload.get("code") != 0:
-        frappe.log_error(status_payload, "DCU Status Fetch Failed")
+    status_rows = _fetch_all_pages(status_url, headers, {
+        "lang": "en", "concentratorId": None, "status": None, "remark": None,
+        "orderBy": "concentratorId asc", "searchTerm": None, "Company": settings.company
+    }, "DCU Status Fetch Failed")
+    if status_rows is None:
         return
 
     statuses = {}
-    for row in status_payload["result"]["data"]:
+    for row in status_rows:
         statuses[row["concentratorId"]] = {
             "status": "Online" if row.get("status") else "Offline",
             "last_seen": frappe.utils.get_datetime(row["statusUpdateDate"]) if row.get("statusUpdateDate") else None
@@ -97,23 +115,17 @@ def sync_all_water_meters():
     headers = {"Authorization": f"Bearer {settings.get_password('api_token')}"}
 
     url = f"{settings.base_url}/api/account/read"
-    body = {
-        "pageNumber": 1, "pageSize": 500, "customerId": None, "meterId": None,
-        "tariffId": None, "remark": None, "createDateRange": None,
-        "updateDateRange": None, "orderBy": "customerId asc", "searchTerm": None,
-        "Company": settings.company
-    }
-    response = requests.post(url, json=body, headers=headers, timeout=30)
-    payload = response.json()
-
-    if payload.get("code") != 0:
-        frappe.log_error(payload, "Water Meter Sync Failed")
-        frappe.msgprint(f"Sync failed: {payload.get('reason')}")
+    rows = _fetch_all_pages(url, headers, {
+        "customerId": None, "meterId": None, "tariffId": None, "remark": None,
+        "createDateRange": None, "updateDateRange": None, "orderBy": "customerId asc",
+        "searchTerm": None, "Company": settings.company
+    }, "Water Meter Sync Failed")
+    if rows is None:
         return
 
     created, updated = 0, 0
 
-    for row in payload["result"]["data"]:
+    for row in rows:
         meter_id = row.get("meterId")
         if not meter_id:
             continue
@@ -157,22 +169,17 @@ def sync_all_meter_readings():
     headers = {"Authorization": f"Bearer {settings.get_password('api_token')}"}
 
     url = f"{settings.base_url}/api/dailydatawater/read"
-    body = {
-        "lang": "en", "pageNumber": 1, "pageSize": 500, "meterId": None,
-        "remark": None, "createDateRange": None, "updateDateRange": None,
-        "orderBy": None, "searchTerm": None, "Company": settings.company
-    }
-    response = requests.post(url, json=body, headers=headers, timeout=30)
-    payload = response.json()
-
-    if payload.get("code") != 0:
-        frappe.log_error(payload, "Meter Reading Sync Failed")
-        frappe.msgprint(f"Sync failed: {payload.get('reason')}")
+    rows = _fetch_all_pages(url, headers, {
+        "lang": "en", "meterId": None, "remark": None, "createDateRange": None,
+        "updateDateRange": None, "orderBy": None, "searchTerm": None,
+        "Company": settings.company
+    }, "Meter Reading Sync Failed")
+    if rows is None:
         return
 
     created, updated, skipped = 0, 0, 0
 
-    for row in payload["result"]["data"]:
+    for row in rows:
         meter_id = row.get("meterId")
         if not meter_id:
             skipped += 1
@@ -212,6 +219,19 @@ def sync_all_meter_readings():
             updated += 1
 
     frappe.db.commit()
+
+    # Water Meter's "Last Synced" should reflect the newest reading we actually
+    # hold for that meter, not just that its account record was touched - that's
+    # what lets a stale value flag a meter as no longer reporting.
+    latest_readings = frappe.db.sql("""
+        SELECT meter, MAX(reading_date) AS last_reading
+        FROM `tabMeter Reading`
+        GROUP BY meter
+    """, as_dict=True)
+    for row in latest_readings:
+        frappe.db.set_value("Water Meter", row.meter, "datetime_zrga", row.last_reading, update_modified=False)
+
+    frappe.db.commit()
     frappe.msgprint(f"Meter Reading sync complete: {created} created, {updated} updated, {skipped} skipped")
 
 
@@ -221,24 +241,18 @@ def sync_all_token_records():
     headers = {"Authorization": f"Bearer {settings.get_password('api_token')}"}
 
     url = f"{settings.base_url}/api/token/creditWaterTokenRecord/read"
-    body = {
-        "pageNumber": 1, "pageSize": 500, "receiptId": None, "status": True,
-        "customerId": None, "customerName": None, "meterId": None, "meterType": None,
-        "tariffId": None, "remark": None, "token": None, "createDateRange": None,
-        "updateDateRange": None, "orderBy": "receiptId desc", "searchTerm": None,
-        "Company": settings.company
-    }
-    response = requests.post(url, json=body, headers=headers, timeout=30)
-    payload = response.json()
-
-    if payload.get("code") != 0:
-        frappe.log_error(payload, "Token Record Sync Failed")
-        frappe.msgprint(f"Sync failed: {payload.get('reason')}")
+    rows = _fetch_all_pages(url, headers, {
+        "receiptId": None, "status": True, "customerId": None, "customerName": None,
+        "meterId": None, "meterType": None, "tariffId": None, "remark": None, "token": None,
+        "createDateRange": None, "updateDateRange": None, "orderBy": "receiptId desc",
+        "searchTerm": None, "Company": settings.company
+    }, "Token Record Sync Failed")
+    if rows is None:
         return
 
     created, updated, skipped = 0, 0, 0
 
-    for row in payload["result"]["data"]:
+    for row in rows:
         receipt_id = str(row.get("receiptId"))
         meter_id = row.get("meterId")
 
