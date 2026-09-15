@@ -1,0 +1,21 @@
+{
+ "color": "#10b981",
+ "creation": "2026-09-15 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Water Meter",
+ "filters_json": "[[\"Water Meter\",\"status\",\"=\",\"Active\"]]",
+ "function": "Count",
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Active Water Meters",
+ "modified": "2026-09-15 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Hydrax",
+ "name": "Active Water Meters",
+ "owner": "Administrator",
+ "show_full_number": 0,
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Document Type"
+}

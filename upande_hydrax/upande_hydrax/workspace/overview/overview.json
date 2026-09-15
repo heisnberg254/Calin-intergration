@@ -1,7 +1,7 @@
 {
  "app": "upande_hydrax",
  "charts": [],
- "content": "[{\"id\": \"0e4768cd69\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"Upande Sensors\", \"col\": 12}}]",
+ "content": "[{\"id\": \"nc-active-meters\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Active Water Meters\", \"col\": 4}}, {\"id\": \"0e4768cd69\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"Upande Sensors\", \"col\": 12}}]",
  "custom_blocks": [
   {
    "custom_block_name": "Upande Sensors",
@@ -20,11 +20,16 @@
  "link_to": null,
  "link_type": "DocType",
  "links": [],
- "modified": "2026-09-11 01:00:00.000000",
+ "modified": "2026-09-15 12:00:00.000000",
  "module": "Upande Hydrax",
  "module_onboarding": null,
  "name": "Overview",
- "number_cards": [],
+ "number_cards": [
+  {
+   "label": "Active Water Meters",
+   "number_card_name": "Active Water Meters"
+  }
+ ],
  "parent_page": "Upande Calin Integration",
  "public": 1,
  "quick_lists": [],
