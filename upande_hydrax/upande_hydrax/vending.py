@@ -39,6 +39,10 @@ def vend_token(c2b_name):
     if c2b.docstatus != 1:
         return
 
+    # Hold the payment row until this run commits, so two runs for the same
+    # payment can't both pass the check below and each buy a token
+    frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "name", for_update=True)
+
     # One token per M-Pesa transaction, however many times this runs
     existing = frappe.db.exists("Token Record", {"mpesa_receipt_number": c2b.transid})
     if existing:
