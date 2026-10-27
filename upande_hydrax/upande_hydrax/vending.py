@@ -103,10 +103,13 @@ def vend_token(c2b_name):
 
     row = payload["result"]
     try:
+        # Calin's generate reply carries receiptId 0; the real receipt number is
+        # only on the stored record, and Token Records are named by it
+        receipt_id = row.get("receiptId") or _find_receipt_id(meter_id, row, settings, headers)
         fields = token_record_fields(row)
         fields.update({
             "doctype": "Token Record",
-            "receipt_id": str(row["receiptId"]),
+            "receipt_id": str(receipt_id),
             "meter": meter_id,
             "mpesa_receipt_number": c2b.transid,
             "type": "Top Up",
@@ -125,6 +128,28 @@ def vend_token(c2b_name):
 
     _send_token_sms(c2b, token_record, settings, headers)
     return token_record.name
+
+
+def _find_receipt_id(meter_id, row, settings, headers):
+    """Look up Calin's receipt number for a sale it has just recorded, matching
+    the meter's newest records on token (or, for a sale with no token, on time
+    and amount). Raises if it can't be found, so the sale is logged for staff
+    rather than saved under a made-up number."""
+    response = requests.post(
+        f"{settings.base_url}/API/Token/CreditWaterTokenRecord/Read",
+        json={"meterId": meter_id, "status": True, "orderBy": "receiptId desc",
+            "pageNumber": 1, "pageSize": 10, "company": settings.company},
+        headers=headers,
+        timeout=30,
+    )
+    for record in response.json()["result"]["data"]:
+        if row.get("token"):
+            if record.get("token") == row["token"]:
+                return record["receiptId"]
+        elif record.get("createDate") == row.get("createDate") and record.get("totalPaid") == row.get("totalPaid"):
+            return record["receiptId"]
+
+    raise LookupError(f"No Calin record for meter {meter_id} matches the sale just made")
 
 
 def _tariff_price(tariff_id, settings, headers):
