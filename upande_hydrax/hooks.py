@@ -305,6 +305,12 @@ scheduler_events = {
     ]
 }
 
+doc_events = {
+    "Mpesa C2B Payment Register": {
+        "on_submit": "upande_hydrax.upande_hydrax.vending.queue_token_vend"
+    }
+}
+
 fixtures = [
     {"doctype": "Custom HTML Block", "filters": [["name", "in", ["Upande Sensors"]]]},
     {"doctype": "Client Script", "filters": [["dt", "in", ["DCU", "Token Record", "Water Meter", "Meter Reading"]]]}
