@@ -94,7 +94,10 @@ def vend_token(c2b_name):
         _log_vend_error(c2b, f"No response from Calin; check Calin before retrying\n{frappe.get_traceback()}")
         return
 
-    if payload.get("code") != 0 or not (payload.get("result") or {}).get("token"):
+    # code 0 means Calin has recorded the sale, even with no token: a payment too
+    # small for a whole unit is credited to the meter, and must still be saved
+    # here so the payment is never sold twice
+    if payload.get("code") != 0 or not payload.get("result"):
         _log_vend_error(c2b, f"Calin refused the token: {payload}")
         return
 
@@ -173,17 +176,26 @@ def _log_vend_error(c2b, message):
 def _send_token_sms(c2b, token_record, settings, headers):
     phone = _customer_phone(c2b, token_record.customer_id, settings, headers)
     if not phone:
-        frappe.log_error(
-            f"No phone for Calin customer {token_record.customer_id}; token {token_record.token} "
-            f"(Token Record {token_record.name}) must be given to the customer another way",
-            SMS_ERROR_TITLE,
-        )
+        # Only worth chasing when there is a token the customer needs to enter
+        if token_record.token:
+            frappe.log_error(
+                f"No phone for Calin customer {token_record.customer_id}; token {token_record.token} "
+                f"(Token Record {token_record.name}) must be given to the customer another way",
+                SMS_ERROR_TITLE,
+            )
         return
 
-    msg = (
-        f"Hydrax Water: your token for meter {token_record.meter} is {token_record.token}. "
-        f"KES {c2b.transamount}, {token_record.total_unit} units of water. M-Pesa ref {c2b.transid}."
-    )
+    if token_record.token:
+        msg = (
+            f"Hydrax Water: your token for meter {token_record.meter} is {token_record.token}. "
+            f"KES {c2b.transamount}, {token_record.total_unit} units of water. M-Pesa ref {c2b.transid}."
+        )
+    else:
+        msg = (
+            f"Hydrax Water: KES {c2b.transamount} received for meter {token_record.meter} and credited "
+            f"to your account. It does not yet cover a unit of water, so there is no token this time. "
+            f"M-Pesa ref {c2b.transid}."
+        )
     send_sms([phone], msg, success_msg=False)
 
 
