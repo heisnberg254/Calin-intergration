@@ -17,6 +17,7 @@
   "amount_paid",
   "token",
   "total_unit",
+  "unit_price",
   "token_first",
   "token_second",
   "repayment_amount",
@@ -103,6 +104,13 @@
    "label": "Total Unit"
   },
   {
+   "description": "Calin tariff price per unit of water when the ERP vended this token",
+   "fieldname": "unit_price",
+   "fieldtype": "Currency",
+   "label": "Price per Unit",
+   "read_only": 1
+  },
+  {
    "fieldname": "customer_id",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -139,7 +147,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-10 08:52:19.330141",
+ "modified": "2026-10-27 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Upande Hydrax",
  "name": "Token Record",

@@ -60,11 +60,27 @@ def vend_token(c2b_name):
         "meterId": meter_id,
         "amount": c2b.transamount,
         "isVendByTotalPaid": True,
-        "isPreview": False,
-        "authorizationPassword": vending_password,
+        "isPreview": True,
         "company": settings.company,
     }
 
+    # Preview first: Calin applies the meter's tariff and any debt repayment and
+    # says how much water the payment buys, without issuing anything. Vending by
+    # the amount paid (not by units) keeps the token in line with the money,
+    # since vending by units makes Calin add debt on top.
+    try:
+        preview = requests.post(url, json=body, headers=headers, timeout=60).json()
+    except Exception:
+        _log_vend_error(c2b, f"Calin preview failed; nothing was issued, safe to retry\n{frappe.get_traceback()}")
+        return
+
+    if preview.get("code") != 0:
+        _log_vend_error(c2b, f"Calin preview refused; nothing was issued: {preview}")
+        return
+
+    unit_price = _tariff_price(preview["result"].get("tariffId"), settings, headers)
+
+    body.update({"isPreview": False, "authorizationPassword": vending_password})
     try:
         response = requests.post(url, json=body, headers=headers, timeout=60)
         payload = response.json()
@@ -87,7 +103,12 @@ def vend_token(c2b_name):
             "meter": meter_id,
             "mpesa_receipt_number": c2b.transid,
             "type": "Top Up",
+            "unit_price": unit_price,
         })
+        if row.get("totalUnit") != preview["result"].get("totalUnit"):
+            fields["remark"] = (
+                f"Calin previewed {preview['result'].get('totalUnit')} units but issued {row.get('totalUnit')}"
+            )
         token_record = frappe.get_doc(fields).insert(ignore_permissions=True)
         frappe.db.commit()
     except Exception:
@@ -97,6 +118,23 @@ def vend_token(c2b_name):
 
     _send_token_sms(c2b, token_record, settings, headers)
     return token_record.name
+
+
+def _tariff_price(tariff_id, settings, headers):
+    """Price per unit of water for a Calin tariff, for the record; None if Calin
+    can't say, which never stops a vend."""
+    try:
+        response = requests.post(
+            f"{settings.base_url}/API/Tariff/Read",
+            json={"tariffId": tariff_id, "pageNumber": 1, "pageSize": 1, "company": settings.company},
+            headers=headers,
+            timeout=30,
+        )
+        rows = response.json()["result"]["data"]
+    except Exception:
+        return None
+
+    return rows[0].get("price") if rows else None
 
 
 def _find_meter(bill_ref):
@@ -140,7 +178,7 @@ def _send_token_sms(c2b, token_record, settings, headers):
 
     msg = (
         f"Hydrax Water: your token for meter {token_record.meter} is {token_record.token}. "
-        f"KES {c2b.transamount}, {token_record.total_unit} units. M-Pesa ref {c2b.transid}."
+        f"KES {c2b.transamount}, {token_record.total_unit} units of water. M-Pesa ref {c2b.transid}."
     )
     send_sms([phone], msg, success_msg=False)
 

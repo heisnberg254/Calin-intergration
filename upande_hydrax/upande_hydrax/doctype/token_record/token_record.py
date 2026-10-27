@@ -32,6 +32,7 @@ class TokenRecord(Document):
 		token_second: DF.Data | None
 		total_unit: DF.Float
 		type: DF.Literal["Top Up", "Repayment", "Adjustment"]
+		unit_price: DF.Currency
 		updated_dat: DF.Datetime | None
 	# end: auto-generated types
 
