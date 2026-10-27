@@ -235,6 +235,30 @@ def sync_all_meter_readings():
     frappe.msgprint(f"Meter Reading sync complete: {created} created, {updated} updated, {skipped} skipped")
 
 
+def token_record_fields(row):
+    """Map a Calin credit-water-token row (from the record read or from
+    token generation) onto Token Record fields."""
+    created_date = frappe.utils.get_datetime(row["createDate"]) if row.get("createDate") else None
+    update_date = frappe.utils.get_datetime(row["updateDate"]) if row.get("updateDate") else None
+
+    return {
+        "customer_id": row.get("customerId"),
+        "customer_name": row.get("customerName"),
+        "tariff_id": row.get("tariffId"),
+        "amount_paid": row.get("totalPaid"),
+        "token": row.get("token"),
+        "token_first": row.get("tokenFirst"),
+        "token_second": row.get("tokenSecond"),
+        "total_unit": row.get("totalUnit"),
+        "repayment_amount": row.get("repaymentAmount"),
+        "debt_remaining": row.get("debtRemaining"),
+        "closing_balance": row.get("closingBalance"),
+        "remark": row.get("remark"),
+        "created_date": created_date,
+        "updated_dat": update_date
+    }
+
+
 @frappe.whitelist()
 def sync_all_token_records():
     settings = frappe.get_single("URL Setup Settings")
@@ -264,25 +288,7 @@ def sync_all_token_records():
             skipped += 1
             continue
 
-        created_date = frappe.utils.get_datetime(row["createDate"]) if row.get("createDate") else None
-        update_date = frappe.utils.get_datetime(row["updateDate"]) if row.get("updateDate") else None
-
-        fields = {
-            "customer_id": row.get("customerId"),
-            "customer_name": row.get("customerName"),
-            "tariff_id": row.get("tariffId"),
-            "amount_paid": row.get("totalPaid"),
-            "token": row.get("token"),
-            "token_first": row.get("tokenFirst"),
-            "token_second": row.get("tokenSecond"),
-            "total_unit": row.get("totalUnit"),
-            "repayment_amount": row.get("repaymentAmount"),
-            "debt_remaining": row.get("debtRemaining"),
-            "closing_balance": row.get("closingBalance"),
-            "remark": row.get("remark"),
-            "created_date": created_date,
-            "updated_dat": update_date
-        }
+        fields = token_record_fields(row)
 
         if not frappe.db.exists("Token Record", receipt_id):
             fields["doctype"] = "Token Record"
