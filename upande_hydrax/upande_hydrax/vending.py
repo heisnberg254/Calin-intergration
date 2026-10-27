@@ -34,6 +34,11 @@ def vend_token(c2b_name):
     customer ID."""
     c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
 
+    # Only a submitted payment has been accepted against a customer; a draft
+    # one is still waiting for someone to sort it out
+    if c2b.docstatus != 1:
+        return
+
     # One token per M-Pesa transaction, however many times this runs
     existing = frappe.db.exists("Token Record", {"mpesa_receipt_number": c2b.transid})
     if existing:
@@ -44,6 +49,11 @@ def vend_token(c2b_name):
         return
 
     settings = frappe.get_single("URL Setup Settings")
+    vending_password = settings.get_password("vending_password", raise_exception=False)
+    if not vending_password:
+        _log_vend_error(c2b, "Vending Authorization Password is not set in URL Setup Settings")
+        return
+
     headers = {"Authorization": f"Bearer {settings.get_password('api_token')}"}
     url = f"{settings.base_url}/API/Token/CreditWaterToken/Generate"
     body = {
@@ -51,6 +61,7 @@ def vend_token(c2b_name):
         "amount": c2b.transamount,
         "isVendByTotalPaid": True,
         "isPreview": False,
+        "authorizationPassword": vending_password,
         "company": settings.company,
     }
 

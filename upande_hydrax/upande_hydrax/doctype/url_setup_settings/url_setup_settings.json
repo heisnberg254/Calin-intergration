@@ -9,6 +9,7 @@
   "company",
   "base_url",
   "api_token",
+  "vending_password",
   "sync_frequency"
  ],
  "fields": [
@@ -28,6 +29,12 @@
    "label": "API Token"
   },
   {
+   "description": "Calin authorization password required to issue (vend) water tokens",
+   "fieldname": "vending_password",
+   "fieldtype": "Password",
+   "label": "Vending Authorization Password"
+  },
+  {
    "fieldname": "sync_frequency",
    "fieldtype": "Select",
    "label": "Sync Frequency"
@@ -37,7 +44,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-17 23:45:25.281000",
+ "modified": "2026-10-27 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Upande Hydrax",
  "name": "URL Setup Settings",
