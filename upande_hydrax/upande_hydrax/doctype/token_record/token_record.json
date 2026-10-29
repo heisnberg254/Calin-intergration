@@ -24,6 +24,7 @@
   "debt_remaining",
   "closing_balance",
   "mpesa_receipt_number",
+  "sales_invoice",
   "is_preview",
   "type",
   "remark"
@@ -86,6 +87,13 @@
    "in_list_view": 1,
    "label": "MPesa Receipt Number",
    "search_index": 1
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
   },
   {
    "default": "0",

@@ -26,6 +26,7 @@ class TokenRecord(Document):
 		receipt_id: DF.Data | None
 		remark: DF.SmallText | None
 		repayment_amount: DF.Currency
+		sales_invoice: DF.Link | None
 		tariff_id: DF.Data | None
 		token: DF.Data | None
 		token_first: DF.Data | None

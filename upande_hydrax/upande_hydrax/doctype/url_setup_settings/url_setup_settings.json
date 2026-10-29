@@ -11,6 +11,7 @@
   "api_token",
   "vending_password",
   "sync_frequency",
+  "water_item",
   "service_charge_section",
   "service_charge_company",
   "service_charge_item",
@@ -42,6 +43,13 @@
    "fieldname": "sync_frequency",
    "fieldtype": "Select",
    "label": "Sync Frequency"
+  },
+  {
+   "description": "Non-stock item for the Sales Invoice raised for every token sold, paid from the M-Pesa payment. Leave blank to raise none",
+   "fieldname": "water_item",
+   "fieldtype": "Link",
+   "label": "Water Item",
+   "options": "Item"
   },
   {
    "description": "Raised as a Sales Invoice for each customer on the 1st of every month. An M-Pesa payment clears any unpaid charge before buying water",

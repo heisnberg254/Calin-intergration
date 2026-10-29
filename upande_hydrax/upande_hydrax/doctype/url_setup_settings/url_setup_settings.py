@@ -24,6 +24,7 @@ class URLSetupSettings(Document):
 		service_charge_rates: DF.Table[ServiceChargeRate]
 		sync_frequency: DF.Literal[None]
 		vending_password: DF.Password | None
+		water_item: DF.Link | None
 	# end: auto-generated types
 
 	_DOCTYPE_NAME = "Calin Settings"

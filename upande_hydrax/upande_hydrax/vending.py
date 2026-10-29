@@ -1,6 +1,9 @@
 import frappe
 import requests
 from frappe.core.doctype.sms_settings.sms_settings import send_sms
+from frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry import (
+    create_and_reconcile_payment_reconciliation,
+)
 
 from upande_hydrax.upande_hydrax.billing import outstanding_service_charge
 from upande_hydrax.upande_hydrax.tasks import token_record_fields
@@ -8,6 +11,7 @@ from upande_hydrax.upande_hydrax.tasks import token_record_fields
 # Error Log titles; the "M-Pesa Payment Failed" Notification alerts staff on these
 VEND_ERROR_TITLE = "Calin Token Vend Error"
 SMS_ERROR_TITLE = "Calin Token SMS Not Sent"
+INVOICE_ERROR_TITLE = "Water Sale Not Invoiced"
 
 
 def queue_token_vend(doc, method=None):
@@ -144,8 +148,58 @@ def vend_token(c2b_name):
         _log_vend_error(c2b, f"Token issued by Calin but not saved: {row}\n{frappe.get_traceback()}")
         return
 
+    _invoice_water(c2b, token_record, water_amount, settings)
     _send_token_sms(c2b, token_record, water_amount, settings, headers)
     return token_record.name
+
+
+def _invoice_water(c2b, token_record, water_amount, settings):
+    """Bill the water just sold and settle the bill from the M-Pesa payment, so
+    the sale is booked as revenue instead of sitting on the Payment Entry as an
+    unallocated advance."""
+    if not settings.water_item or not c2b.customer:
+        return
+
+    try:
+        invoice = frappe.get_doc({
+            "doctype": "Sales Invoice",
+            "customer": c2b.customer,
+            "company": c2b.company,
+            "set_posting_time": 1,
+            "posting_date": c2b.posting_date,
+            "due_date": c2b.posting_date,
+            "remarks": f"Water for meter {token_record.meter}, M-Pesa {c2b.transid}",
+            "items": [{
+                "item_code": settings.water_item,
+                "qty": 1,
+                "rate": water_amount,
+                "description": (
+                    f"{token_record.total_unit} units of water for meter {token_record.meter}, "
+                    f"Calin receipt {token_record.receipt_id}"
+                ),
+            }],
+        })
+        invoice.insert(ignore_permissions=True)
+        invoice.submit()
+
+        if c2b.payment_entry:
+            create_and_reconcile_payment_reconciliation(
+                outstanding_invoices=[invoice.name],
+                customer=c2b.customer,
+                company=c2b.company,
+                payment_entries=[c2b.payment_entry],
+            )
+
+        frappe.db.set_value("Token Record", token_record.name, "sales_invoice", invoice.name)
+        frappe.db.commit()
+    except Exception:
+        # The token is already sold and saved; only the bookkeeping is missing
+        frappe.db.rollback()
+        frappe.log_error(
+            f"C2B {c2b.name}, M-Pesa {c2b.transid}, Token Record {token_record.name}: "
+            f"KES {water_amount} of water sold but not invoiced\n{frappe.get_traceback()}",
+            INVOICE_ERROR_TITLE,
+        )
 
 
 def _water_amount(c2b):
