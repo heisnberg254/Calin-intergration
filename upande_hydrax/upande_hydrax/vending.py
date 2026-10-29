@@ -12,6 +12,13 @@ SMS_ERROR_TITLE = "Calin Token SMS Not Sent"
 def queue_token_vend(doc, method=None):
     """doc_events hook: once an M-Pesa C2B payment is submitted, vend its token
     in the background so a slow or failing Calin call never blocks the payment."""
+    # frappe_mpsa_payments submits the payment from its after_insert, so Frappe
+    # runs on_submit twice in the same request; deduplicate can't catch that
+    # because neither job is in the queue until the request commits
+    if doc.flags.calin_vend_queued:
+        return
+    doc.flags.calin_vend_queued = True
+
     frappe.enqueue(
         "upande_hydrax.upande_hydrax.vending.vend_token",
         queue="short",
@@ -32,6 +39,9 @@ def vend_token(c2b_name):
     """Buy a Calin water token for an M-Pesa C2B payment, save it as a Token
     Record and SMS it to the customer. The paybill account number is the Calin
     customer ID."""
+    # Hold the payment row until this run commits, so two runs for the same
+    # payment can't both pass the check below and each buy a token
+    frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "name", for_update=True)
     c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
 
     # Only a submitted payment has been accepted against a customer; a draft
@@ -39,12 +49,12 @@ def vend_token(c2b_name):
     if c2b.docstatus != 1:
         return
 
-    # Hold the payment row until this run commits, so two runs for the same
-    # payment can't both pass the check below and each buy a token
-    frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "name", for_update=True)
-
-    # One token per M-Pesa transaction, however many times this runs
-    existing = frappe.db.exists("Token Record", {"mpesa_receipt_number": c2b.transid})
+    # One token per M-Pesa transaction, however many times this runs. A locking
+    # read, because a plain one sees this transaction's snapshot, taken before
+    # the lock was granted, and misses a Token Record another run just saved
+    existing = frappe.db.get_value(
+        "Token Record", {"mpesa_receipt_number": c2b.transid}, "name", for_update=True
+    )
     if existing:
         return existing
 
