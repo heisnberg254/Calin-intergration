@@ -302,6 +302,9 @@ scheduler_events = {
         "upande_hydrax.upande_hydrax.tasks.sync_all_water_meters",
         "upande_hydrax.upande_hydrax.tasks.sync_all_meter_readings",
         "upande_hydrax.upande_hydrax.tasks.sync_all_token_records"
+    ],
+    "monthly": [
+        "upande_hydrax.upande_hydrax.billing.raise_monthly_service_charges"
     ]
 }
 

@@ -10,7 +10,11 @@
   "base_url",
   "api_token",
   "vending_password",
-  "sync_frequency"
+  "sync_frequency",
+  "service_charge_section",
+  "service_charge_company",
+  "service_charge_item",
+  "service_charge_rates"
  ],
  "fields": [
   {
@@ -38,13 +42,40 @@
    "fieldname": "sync_frequency",
    "fieldtype": "Select",
    "label": "Sync Frequency"
+  },
+  {
+   "description": "Raised as a Sales Invoice for each customer on the 1st of every month. An M-Pesa payment clears any unpaid charge before buying water",
+   "fieldname": "service_charge_section",
+   "fieldtype": "Section Break",
+   "label": "Monthly Service Charge"
+  },
+  {
+   "description": "ERPNext company the service charge is invoiced under",
+   "fieldname": "service_charge_company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "description": "Non-stock item used on the service charge invoices",
+   "fieldname": "service_charge_item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "description": "A meter pays the rate of the row that matches it most closely (tariff and site, then tariff, then site). Meters no row matches are not charged",
+   "fieldname": "service_charge_rates",
+   "fieldtype": "Table",
+   "label": "Rates",
+   "options": "Service Charge Rate"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 21:00:00.000000",
+ "modified": "2026-10-29 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Upande Hydrax",
  "name": "URL Setup Settings",

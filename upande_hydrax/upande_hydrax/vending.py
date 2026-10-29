@@ -2,6 +2,7 @@ import frappe
 import requests
 from frappe.core.doctype.sms_settings.sms_settings import send_sms
 
+from upande_hydrax.upande_hydrax.billing import outstanding_service_charge
 from upande_hydrax.upande_hydrax.tasks import token_record_fields
 
 # Error Log titles; the "M-Pesa Payment Failed" Notification alerts staff on these
@@ -69,10 +70,17 @@ def vend_token(c2b_name):
         return
 
     headers = {"Authorization": f"Bearer {settings.get_password('api_token')}"}
+
+    # Any unpaid service charge comes out of the payment before water is bought
+    water_amount = _water_amount(c2b)
+    if water_amount <= 0:
+        _send_charge_only_sms(c2b, meter_id, settings, headers)
+        return
+
     url = f"{settings.base_url}/API/Token/CreditWaterToken/Generate"
     body = {
         "meterId": meter_id,
-        "amount": c2b.transamount,
+        "amount": water_amount,
         "isVendByTotalPaid": True,
         "isPreview": True,
         "company": settings.company,
@@ -136,8 +144,20 @@ def vend_token(c2b_name):
         _log_vend_error(c2b, f"Token issued by Calin but not saved: {row}\n{frappe.get_traceback()}")
         return
 
-    _send_token_sms(c2b, token_record, settings, headers)
+    _send_token_sms(c2b, token_record, water_amount, settings, headers)
     return token_record.name
+
+
+def _water_amount(c2b):
+    """What's left of a payment to buy water with. On submit, frappe_mpsa_payments
+    has already applied the payment to the customer's unpaid invoices, oldest
+    first (the monthly service charge), leaving the rest unallocated on its
+    Payment Entry."""
+    if not c2b.payment_entry:
+        return c2b.transamount
+
+    unallocated = frappe.db.get_value("Payment Entry", c2b.payment_entry, "unallocated_amount")
+    return c2b.transamount if unallocated is None else unallocated
 
 
 def _find_receipt_id(meter_id, row, settings, headers):
@@ -208,7 +228,7 @@ def _log_vend_error(c2b, message):
     )
 
 
-def _send_token_sms(c2b, token_record, settings, headers):
+def _send_token_sms(c2b, token_record, water_amount, settings, headers):
     phone = _customer_phone(c2b, token_record.customer_id, settings, headers)
     if not phone:
         # Only worth chasing when there is a token the customer needs to enter
@@ -220,17 +240,34 @@ def _send_token_sms(c2b, token_record, settings, headers):
             )
         return
 
+    charge_paid = c2b.transamount - water_amount
+    charge_note = f"KES {charge_paid} went to your monthly service charge. " if charge_paid > 0 else ""
     if token_record.token:
         msg = (
             f"Hydrax Water: your token for meter {token_record.meter} is {token_record.token}. "
-            f"KES {c2b.transamount}, {token_record.total_unit} units of water. M-Pesa ref {c2b.transid}."
+            f"{charge_note}KES {water_amount}, {token_record.total_unit} units of water. M-Pesa ref {c2b.transid}."
         )
     else:
         msg = (
-            f"Hydrax Water: KES {c2b.transamount} received for meter {token_record.meter} and credited "
-            f"to your account. It does not yet cover a unit of water, so there is no token this time. "
-            f"M-Pesa ref {c2b.transid}."
+            f"Hydrax Water: KES {c2b.transamount} received for meter {token_record.meter}. {charge_note}"
+            f"KES {water_amount} is credited to your account. It does not yet cover a unit of water, "
+            f"so there is no token this time. M-Pesa ref {c2b.transid}."
         )
+    send_sms([phone], msg, success_msg=False)
+
+
+def _send_charge_only_sms(c2b, meter_id, settings, headers):
+    calin_customer_id = frappe.db.get_value("Water Meter", meter_id, "calin_customer_id")
+    phone = _customer_phone(c2b, calin_customer_id, settings, headers)
+    if not phone:
+        return
+
+    still_owed = outstanding_service_charge(c2b.customer, settings.service_charge_item)
+    owed_note = f"KES {still_owed} is still owed. " if still_owed > 0 else ""
+    msg = (
+        f"Hydrax Water: KES {c2b.transamount} received for meter {meter_id} and applied to your monthly "
+        f"service charge, so no water was bought this time. {owed_note}M-Pesa ref {c2b.transid}."
+    )
     send_sms([phone], msg, success_msg=False)
 
 

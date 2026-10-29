@@ -14,9 +14,14 @@ class URLSetupSettings(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		from upande_hydrax.upande_hydrax.doctype.service_charge_rate.service_charge_rate import ServiceChargeRate
+
 		api_token: DF.Password | None
 		base_url: DF.Data | None
 		company: DF.Data | None
+		service_charge_company: DF.Link | None
+		service_charge_item: DF.Link | None
+		service_charge_rates: DF.Table[ServiceChargeRate]
 		sync_frequency: DF.Literal[None]
 		vending_password: DF.Password | None
 	# end: auto-generated types
