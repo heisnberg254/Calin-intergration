@@ -253,19 +253,27 @@ def _tariff_price(tariff_id, settings, headers):
     return rows[0].get("price") if rows else None
 
 
-def _find_meter(bill_ref):
-    """Return the Water Meter for a Calin customer ID typed as the paybill account
+def meters_for_account(bill_ref):
+    """Return the active Water Meters whose Calin customer ID is the paybill account
     number, ignoring case and spaces ("upande 1" finds "Upande1")."""
     ref = (bill_ref or "").replace(" ", "")
     if not ref:
-        return None
+        return []
 
-    meters = frappe.db.sql(
+    return frappe.db.sql(
         """SELECT name FROM `tabWater Meter`
         WHERE REPLACE(calin_customer_id, ' ', '') = %s AND status != 'Inactive'""",
         (ref,),
         pluck=True,
     )
+
+
+def _find_meter(bill_ref):
+    """Return the one Water Meter the paybill account number points to, or None."""
+    if not (bill_ref or "").replace(" ", ""):
+        return None
+
+    meters = meters_for_account(bill_ref)
     if len(meters) == 1:
         return meters[0]
 

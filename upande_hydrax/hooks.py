@@ -314,6 +314,11 @@ doc_events = {
     }
 }
 
+# Safaricom's C2B validation call: reject account numbers no Water Meter has
+override_whitelisted_methods = {
+    "frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.validation": "upande_hydrax.upande_hydrax.mpsa_validation.validation"
+}
+
 fixtures = [
     {"doctype": "Custom HTML Block", "filters": [["name", "in", ["Upande Sensors"]]]},
     {"doctype": "Client Script", "filters": [["dt", "in", ["DCU", "Token Record", "Water Meter", "Meter Reading"]]]}
