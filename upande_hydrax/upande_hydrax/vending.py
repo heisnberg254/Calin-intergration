@@ -1,5 +1,6 @@
 import frappe
 import requests
+from frappe.utils import flt
 from frappe.core.doctype.sms_settings.sms_settings import send_sms
 from frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry import (
     create_and_reconcile_payment_reconciliation,
@@ -149,7 +150,7 @@ def vend_token(c2b_name):
         return
 
     _invoice_water(c2b, token_record, water_amount, settings)
-    _send_token_sms(c2b, token_record, water_amount, settings, headers)
+    _send_token_sms(c2b, token_record, settings, headers)
     return token_record.name
 
 
@@ -290,7 +291,7 @@ def _log_vend_error(c2b, message):
     )
 
 
-def _send_token_sms(c2b, token_record, water_amount, settings, headers):
+def _send_token_sms(c2b, token_record, settings, headers):
     phone = _customer_phone(c2b, token_record.customer_id, settings, headers)
     if not phone:
         # Only worth chasing when there is a token the customer needs to enter
@@ -302,20 +303,20 @@ def _send_token_sms(c2b, token_record, water_amount, settings, headers):
             )
         return
 
-    charge_paid = c2b.transamount - water_amount
-    charge_note = f"KES {charge_paid} went to your monthly service charge. " if charge_paid > 0 else ""
-    if token_record.token:
-        msg = (
-            f"Hydrax Water: your token for meter {token_record.meter} is {token_record.token}. "
-            f"{charge_note}KES {water_amount}, {token_record.total_unit} units of water. M-Pesa ref {c2b.transid}."
-        )
-    else:
-        msg = (
-            f"Hydrax Water: KES {c2b.transamount} received for meter {token_record.meter}. {charge_note}"
-            f"KES {water_amount} is credited to your account. It does not yet cover a unit of water, "
-            f"so there is no token this time. M-Pesa ref {c2b.transid}."
-        )
+    # Calin's closing balance is the debt left on the meter after this sale
+    msg = (
+        f"Token: {token_record.token or 'none'}\n"
+        f"Customer: {token_record.customer_name or c2b.customer}\n"
+        f"Amount paid: {_amount(c2b.transamount)}\n"
+        f"Units: {_amount(token_record.total_unit)}\n"
+        f"Outstanding debt: {_amount(token_record.closing_balance)}"
+    )
     send_sms([phone], msg, success_msg=False)
+
+
+def _amount(value):
+    """100 rather than 100.0, but 0.1 and 12.5 as they are."""
+    return f"{flt(value):,.2f}".rstrip("0").rstrip(".")
 
 
 def _send_charge_only_sms(c2b, meter_id, settings, headers):
