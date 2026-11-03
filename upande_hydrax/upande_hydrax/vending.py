@@ -335,10 +335,13 @@ def _send_charge_only_sms(c2b, meter_id, settings, headers):
 
 
 def _customer_phone(c2b, calin_customer_id, settings, headers):
-    """The payer's number is masked by Safaricom, so use the phone on the ERPNext
-    Customer, falling back to the one held in Calin."""
+    """The payer's number is masked by Safaricom, so use the phone on one of the
+    Customer's Contacts, then the Customer itself, falling back to the one held in
+    Calin. The Contact comes first because the Customer's mobile_no is only a copy
+    taken when the primary contact was picked, and goes stale when the Contact is
+    edited."""
     if c2b.customer:
-        phone = frappe.db.get_value("Customer", c2b.customer, "mobile_no")
+        phone = _contact_phone(c2b.customer) or frappe.db.get_value("Customer", c2b.customer, "mobile_no")
         if phone:
             return phone
 
@@ -354,3 +357,20 @@ def _customer_phone(c2b, calin_customer_id, settings, headers):
         return None
 
     return rows[0].get("phone") if rows else None
+
+
+def _contact_phone(customer):
+    """Mobile (or else phone) of a Contact linked to the Customer, the primary
+    contact first, then the most recently changed."""
+    numbers = frappe.db.sql(
+        """SELECT COALESCE(NULLIF(c.mobile_no, ''), c.phone)
+        FROM `tabDynamic Link` dl
+        JOIN `tabContact` c ON c.name = dl.parent
+        WHERE dl.parenttype = 'Contact' AND dl.link_doctype = 'Customer' AND dl.link_name = %s
+            AND (c.mobile_no != '' OR c.phone != '')
+        ORDER BY c.is_primary_contact DESC, c.modified DESC
+        LIMIT 1""",
+        (customer,),
+        pluck=True,
+    )
+    return numbers[0] if numbers else None
