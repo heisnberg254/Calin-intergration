@@ -1,3 +1,4 @@
+import hashlib
 import re
 
 import frappe
@@ -349,14 +350,62 @@ def _send_charge_only_sms(c2b, meter_id, settings, headers):
 
 
 def _sms_payer(c2b, msg):
-    """SMS whoever paid, at the hashed number M-Pesa sent in the callback, so the
-    token reaches the payer even when they aren't the meter's registered customer.
-    The gateway resolves Safaricom's hash to the real line. Returns False when the
-    hash couldn't be texted, so the caller can fall back to the number on file."""
-    msisdn = (c2b.msisdn or "").strip()
+    """SMS whoever paid, so the token reaches the payer even when they aren't the
+    meter's registered customer. M-Pesa only gives us a hash of the payer's
+    number, so match it against the numbers we already hold; failing that, ask
+    the gateway to text the hash itself. Returns False when neither works, so
+    the caller can fall back to the customer's number on file."""
+    msisdn = (c2b.msisdn or "").strip().lower()
     if not HASHED_MSISDN.match(msisdn):
         return False
 
+    known = _number_for_hash(msisdn)
+    if known:
+        send_sms([known], msg, success_msg=False)
+        return True
+
+    return _sms_hashed_number(c2b, msisdn, msg)
+
+
+def _number_for_hash(msisdn_hash):
+    """The saved phone number whose hash is the one M-Pesa sent, or None.
+    Safaricom hashes the number as 2547XXXXXXXX (SHA-256, no + or leading 0), so
+    every number on a Contact or Customer is put in that form before hashing.
+    Hashing them all per payment is cheap and always reflects current Contacts."""
+    numbers = frappe.db.sql(
+        """SELECT phone FROM `tabContact Phone` WHERE IFNULL(phone, '') != ''
+        UNION SELECT mobile_no FROM `tabContact` WHERE IFNULL(mobile_no, '') != ''
+        UNION SELECT phone FROM `tabContact` WHERE IFNULL(phone, '') != ''
+        UNION SELECT mobile_no FROM `tabCustomer` WHERE IFNULL(mobile_no, '') != ''""",
+        pluck=True,
+    )
+    for number in numbers:
+        kenyan = _kenyan_msisdn(number)
+        if kenyan and hashlib.sha256(kenyan.encode()).hexdigest() == msisdn_hash:
+            # Africa's Talking wants international format
+            return f"+{kenyan}"
+    return None
+
+
+def _kenyan_msisdn(number):
+    """0712345678, 712345678, +254712345678 and 254 712 345 678 all become
+    254712345678; anything that isn't a Kenyan mobile number becomes None."""
+    digits = re.sub(r"\D", "", number or "")
+    if len(digits) == 12 and digits.startswith("254"):
+        local = digits[3:]
+    elif len(digits) == 10 and digits.startswith("0"):
+        local = digits[1:]
+    elif len(digits) == 9:
+        local = digits
+    else:
+        return None
+    return f"254{local}" if local[0] in "17" else None
+
+
+def _sms_hashed_number(c2b, msisdn, msg):
+    """Ask the gateway to text the hash itself. Africa's Talking currently
+    refuses it (403 InvalidPhoneNumber); kept so it starts working if they turn
+    hashed sending on, without flooding the Error Log until then."""
     gateway = frappe.get_single("SMS Settings")
     params = {p.parameter: p.value for p in gateway.parameters if not p.header}
     api_key = next((p.value for p in gateway.parameters if p.header and p.parameter.lower() == "apikey"), None)
@@ -385,13 +434,10 @@ def _sms_payer(c2b, msg):
         return False
 
     # Africa's Talking answers 201 even when every recipient was refused, so the
-    # per-recipient status is what says whether it went
+    # per-recipient status is what says whether it went. A refusal is expected
+    # while hashed sending isn't enabled, so it isn't logged as an error
     if not any(r.get("statusCode") in AT_ACCEPTED for r in recipients):
-        frappe.log_error(
-            f"C2B {c2b.name}: the SMS gateway refused the payer's hashed number; falling back to the "
-            f"customer's number. Reply: {reply}",
-            SMS_ERROR_TITLE,
-        )
+        frappe.logger("upande_hydrax").info(f"C2B {c2b.name}: gateway refused the hashed number: {reply}")
         return False
 
     frappe.get_doc({
@@ -407,7 +453,7 @@ def _sms_payer(c2b, msg):
 
 
 def _customer_phone(c2b, calin_customer_id, settings, headers):
-    """Fallback for when the payer's hashed number can't be texted: the phone on
+    """Fallback for when the payer's number isn't known: the phone on
     one of the Customer's Contacts, then the Customer itself, falling back to the one held in
     Calin. The Contact comes first because the Customer's mobile_no is only a copy
     taken when the primary contact was picked, and goes stale when the Contact is
