@@ -308,6 +308,12 @@ scheduler_events = {
     ]
 }
 
+# Sets the exchange rates frappe_mpsa_payments leaves empty, which newer ERPNext
+# divides by; extends HRMS's override so its employee logic still runs
+override_doctype_class = {
+    "Payment Entry": "upande_hydrax.upande_hydrax.payment_entry.HydraxPaymentEntry"
+}
+
 doc_events = {
     "Mpesa C2B Payment Register": {
         "on_submit": "upande_hydrax.upande_hydrax.vending.queue_token_vend"
