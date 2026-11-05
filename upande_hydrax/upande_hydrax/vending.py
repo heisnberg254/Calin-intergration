@@ -1,6 +1,8 @@
+import re
+
 import frappe
 import requests
-from frappe.utils import flt
+from frappe.utils import flt, nowdate
 from frappe.core.doctype.sms_settings.sms_settings import send_sms
 from frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry import (
     create_and_reconcile_payment_reconciliation,
@@ -13,6 +15,12 @@ from upande_hydrax.upande_hydrax.tasks import token_record_fields
 VEND_ERROR_TITLE = "Calin Token Vend Error"
 SMS_ERROR_TITLE = "Calin Token SMS Not Sent"
 INVOICE_ERROR_TITLE = "Water Sale Not Invoiced"
+
+# Safaricom hides the payer's number in C2B callbacks behind a SHA-256 hex digest
+HASHED_MSISDN = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+# Africa's Talking per-recipient codes meaning the message was accepted:
+# 100 Processed, 101 Sent, 102 Queued
+AT_ACCEPTED = {100, 101, 102}
 
 
 def queue_token_vend(doc, method=None):
@@ -292,6 +300,17 @@ def _log_vend_error(c2b, message):
 
 
 def _send_token_sms(c2b, token_record, settings, headers):
+    # Calin's closing balance is the debt left on the meter after this sale
+    msg = (
+        f"Token: {token_record.token or 'none'}\n"
+        f"Customer: {token_record.customer_name or c2b.customer}\n"
+        f"Amount paid: {_amount(c2b.transamount)}\n"
+        f"Units: {_amount(token_record.total_unit)}\n"
+        f"Outstanding debt: {_amount(token_record.closing_balance)}"
+    )
+    if _sms_payer(c2b, msg):
+        return
+
     phone = _customer_phone(c2b, token_record.customer_id, settings, headers)
     if not phone:
         # Only worth chasing when there is a token the customer needs to enter
@@ -303,14 +322,6 @@ def _send_token_sms(c2b, token_record, settings, headers):
             )
         return
 
-    # Calin's closing balance is the debt left on the meter after this sale
-    msg = (
-        f"Token: {token_record.token or 'none'}\n"
-        f"Customer: {token_record.customer_name or c2b.customer}\n"
-        f"Amount paid: {_amount(c2b.transamount)}\n"
-        f"Units: {_amount(token_record.total_unit)}\n"
-        f"Outstanding debt: {_amount(token_record.closing_balance)}"
-    )
     send_sms([phone], msg, success_msg=False)
 
 
@@ -320,23 +331,84 @@ def _amount(value):
 
 
 def _send_charge_only_sms(c2b, meter_id, settings, headers):
-    calin_customer_id = frappe.db.get_value("Water Meter", meter_id, "calin_customer_id")
-    phone = _customer_phone(c2b, calin_customer_id, settings, headers)
-    if not phone:
-        return
-
     still_owed = outstanding_service_charge(c2b.customer, settings.service_charge_item)
     owed_note = f"KES {still_owed} is still owed. " if still_owed > 0 else ""
     msg = (
         f"Hydrax Water: KES {c2b.transamount} received for meter {meter_id} and applied to your monthly "
         f"service charge, so no water was bought this time. {owed_note}M-Pesa ref {c2b.transid}."
     )
+    if _sms_payer(c2b, msg):
+        return
+
+    calin_customer_id = frappe.db.get_value("Water Meter", meter_id, "calin_customer_id")
+    phone = _customer_phone(c2b, calin_customer_id, settings, headers)
+    if not phone:
+        return
+
     send_sms([phone], msg, success_msg=False)
 
 
+def _sms_payer(c2b, msg):
+    """SMS whoever paid, at the hashed number M-Pesa sent in the callback, so the
+    token reaches the payer even when they aren't the meter's registered customer.
+    The gateway resolves Safaricom's hash to the real line. Returns False when the
+    hash couldn't be texted, so the caller can fall back to the number on file."""
+    msisdn = (c2b.msisdn or "").strip()
+    if not HASHED_MSISDN.match(msisdn):
+        return False
+
+    gateway = frappe.get_single("SMS Settings")
+    params = {p.parameter: p.value for p in gateway.parameters if not p.header}
+    api_key = next((p.value for p in gateway.parameters if p.header and p.parameter.lower() == "apikey"), None)
+    if not gateway.sms_gateway_url or not api_key:
+        return False
+
+    data = {"username": params.get("username"), "to": msisdn, "message": msg}
+    if params.get("from"):
+        data["from"] = params["from"]
+
+    try:
+        response = requests.post(
+            gateway.sms_gateway_url,
+            data=data,
+            headers={"apiKey": api_key, "Accept": "application/json"},
+            timeout=30,
+        )
+        reply = response.json()
+        recipients = reply["SMSMessageData"]["Recipients"]
+    except Exception:
+        frappe.log_error(
+            f"C2B {c2b.name}: SMS to the payer's hashed number failed; falling back to the customer's "
+            f"number\n{frappe.get_traceback()}",
+            SMS_ERROR_TITLE,
+        )
+        return False
+
+    # Africa's Talking answers 201 even when every recipient was refused, so the
+    # per-recipient status is what says whether it went
+    if not any(r.get("statusCode") in AT_ACCEPTED for r in recipients):
+        frappe.log_error(
+            f"C2B {c2b.name}: the SMS gateway refused the payer's hashed number; falling back to the "
+            f"customer's number. Reply: {reply}",
+            SMS_ERROR_TITLE,
+        )
+        return False
+
+    frappe.get_doc({
+        "doctype": "SMS Log",
+        "sent_on": nowdate(),
+        "message": msg,
+        "no_of_requested_sms": 1,
+        "requested_numbers": msisdn,
+        "no_of_sent_sms": 1,
+        "sent_to": msisdn,
+    }).insert(ignore_permissions=True)
+    return True
+
+
 def _customer_phone(c2b, calin_customer_id, settings, headers):
-    """The payer's number is masked by Safaricom, so use the phone on one of the
-    Customer's Contacts, then the Customer itself, falling back to the one held in
+    """Fallback for when the payer's hashed number can't be texted: the phone on
+    one of the Customer's Contacts, then the Customer itself, falling back to the one held in
     Calin. The Contact comes first because the Customer's mobile_no is only a copy
     taken when the primary contact was picked, and goes stale when the Contact is
     edited."""
