@@ -352,19 +352,22 @@ def _send_charge_only_sms(c2b, meter_id, settings, headers):
 def _sms_payer(c2b, msg):
     """SMS whoever paid, so the token reaches the payer even when they aren't the
     meter's registered customer. M-Pesa only gives us a hash of the payer's
-    number, so match it against the numbers we already hold; failing that, ask
-    the gateway to text the hash itself. Returns False when neither works, so
-    the caller can fall back to the customer's number on file."""
+    number: Africa's Talking can text the hash directly, which reaches any payer;
+    if that fails, text a saved number whose hash matches. Returns False when
+    neither works, so the caller can fall back to the customer's number on file."""
     msisdn = (c2b.msisdn or "").strip().lower()
     if not HASHED_MSISDN.match(msisdn):
         return False
+
+    if _sms_hashed_number(c2b, msisdn, msg):
+        return True
 
     known = _number_for_hash(msisdn)
     if known:
         send_sms([known], msg, success_msg=False)
         return True
 
-    return _sms_hashed_number(c2b, msisdn, msg)
+    return False
 
 
 def _number_for_hash(msisdn_hash):
@@ -403,23 +406,35 @@ def _kenyan_msisdn(number):
 
 
 def _sms_hashed_number(c2b, msisdn, msg):
-    """Ask the gateway to text the hash itself. Africa's Talking currently
-    refuses it (403 InvalidPhoneNumber); kept so it starts working if they turn
-    hashed sending on, without flooding the Error Log until then."""
+    """Have Africa's Talking text the Safaricom hash itself. The plain messaging
+    endpoint refuses a hash in "to" (403 InvalidPhoneNumber); hashes go to the
+    bulk endpoint as maskedNumber with telco Safaricom, as in AT's own SDK
+    (SMSService.send_hashed)."""
     gateway = frappe.get_single("SMS Settings")
     params = {p.parameter: p.value for p in gateway.parameters if not p.header}
     api_key = next((p.value for p in gateway.parameters if p.header and p.parameter.lower() == "apikey"), None)
     if not gateway.sms_gateway_url or not api_key:
         return False
 
-    data = {"username": params.get("username"), "to": msisdn, "message": msg}
+    # https://api.africastalking.com/version1/messaging -> .../messaging/bulk
+    url = gateway.sms_gateway_url.rstrip("/")
+    if not url.endswith("/bulk"):
+        url += "/bulk"
+
+    body = {
+        "username": params.get("username"),
+        "maskedNumber": msisdn,
+        "telco": "Safaricom",
+        "message": msg,
+        "phoneNumbers": [],
+    }
     if params.get("from"):
-        data["from"] = params["from"]
+        body["senderId"] = params["from"]
 
     try:
         response = requests.post(
-            gateway.sms_gateway_url,
-            data=data,
+            url,
+            json=body,
             headers={"apiKey": api_key, "Accept": "application/json"},
             timeout=30,
         )
@@ -434,10 +449,13 @@ def _sms_hashed_number(c2b, msisdn, msg):
         return False
 
     # Africa's Talking answers 201 even when every recipient was refused, so the
-    # per-recipient status is what says whether it went. A refusal is expected
-    # while hashed sending isn't enabled, so it isn't logged as an error
+    # per-recipient status is what says whether it went
     if not any(r.get("statusCode") in AT_ACCEPTED for r in recipients):
-        frappe.logger("upande_hydrax").info(f"C2B {c2b.name}: gateway refused the hashed number: {reply}")
+        frappe.log_error(
+            f"C2B {c2b.name}: the SMS gateway refused the payer's hashed number; trying saved numbers, "
+            f"then the customer's. Reply: {reply}",
+            SMS_ERROR_TITLE,
+        )
         return False
 
     frappe.get_doc({
