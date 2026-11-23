@@ -18,20 +18,9 @@ def get_dashboard_summary():
         WHERE DATE(reading_date) >= %s
     """, (yesterday,))[0][0] or 0
 
+    # Estimated from tokens (see consumption.py); the meters send no readings
     total_consumption_today = frappe.db.sql("""
-        SELECT SUM(curr.cumulative_reading - prev.cumulative_reading)
-        FROM `tabMeter Reading` curr
-        LEFT JOIN `tabMeter Reading` prev
-            ON prev.meter = curr.meter
-            AND prev.reading_date = (
-                SELECT MAX(r2.reading_date)
-                FROM `tabMeter Reading` r2
-                WHERE r2.meter = curr.meter
-                AND r2.reading_date < curr.reading_date
-            )
-        WHERE DATE(curr.reading_date) = %s
-            AND curr.cumulative_reading IS NOT NULL AND curr.cumulative_reading != -1
-            AND prev.cumulative_reading IS NOT NULL AND prev.cumulative_reading != -1
+        SELECT SUM(daily_consumption) FROM `tabDaily Water Consumption` WHERE date = %s
     """, (today,))[0][0] or 0
 
     revenue_today = frappe.db.sql("""
@@ -98,24 +87,14 @@ def get_site_list():
 @frappe.whitelist()
 def get_consumption_trend(days: int = 14):
     start_date = frappe.utils.add_days(frappe.utils.nowdate(), -(int(days) - 1))
+    # Estimated from tokens (see consumption.py); the meters send no readings
     rows = frappe.db.sql("""
-        SELECT DATE(curr.reading_date) AS day,
-            SUM(curr.cumulative_reading - prev.cumulative_reading) AS consumption
-        FROM `tabMeter Reading` curr
-        LEFT JOIN `tabMeter Reading` prev
-            ON prev.meter = curr.meter
-            AND prev.reading_date = (
-                SELECT MAX(r2.reading_date)
-                FROM `tabMeter Reading` r2
-                WHERE r2.meter = curr.meter
-                AND r2.reading_date < curr.reading_date
-            )
-        WHERE DATE(curr.reading_date) >= %s
-            AND curr.cumulative_reading IS NOT NULL AND curr.cumulative_reading != -1
-            AND prev.cumulative_reading IS NOT NULL AND prev.cumulative_reading != -1
-        GROUP BY DATE(curr.reading_date)
+        SELECT date AS day, SUM(daily_consumption) AS consumption
+        FROM `tabDaily Water Consumption`
+        WHERE date >= %s AND date <= %s
+        GROUP BY date
         ORDER BY day ASC
-    """, (start_date,), as_dict=True)
+    """, (start_date, frappe.utils.nowdate()), as_dict=True)
 
     return {
         "labels": [str(row["day"]) for row in rows],

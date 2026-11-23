@@ -305,7 +305,13 @@ scheduler_events = {
     ],
     "monthly": [
         "upande_hydrax.upande_hydrax.billing.raise_monthly_service_charges"
-    ]
+    ],
+    "cron": {
+        # Half past, after the hourly token sync has pulled in new tokens
+        "30 * * * *": [
+            "upande_hydrax.upande_hydrax.consumption.rebuild_recent"
+        ]
+    }
 }
 
 # Sets the exchange rates frappe_mpsa_payments leaves empty, which newer ERPNext

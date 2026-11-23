@@ -15,8 +15,11 @@ class DailyWaterConsumption(Document):
 		from frappe.types import DF
 
 		daily_consumption: DF.Float
+		date: DF.Date
 		house: DF.Link | None
-		meter_id: DF.Data | None
+		meter_id: DF.Link | None
+		site: DF.Data | None
+		units_m3: DF.Float
 	# end: auto-generated types
 
 	_DOCTYPE_NAME = "Daily Water Consumption"
