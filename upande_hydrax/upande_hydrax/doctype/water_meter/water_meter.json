@@ -41,7 +41,10 @@
    "fieldname": "house_number",
    "fieldtype": "Link",
    "label": "House",
-   "options": "House"
+   "options": "House",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "in_global_search": 1
   },
   {
    "fieldname": "column_break_srfe",
@@ -106,7 +109,10 @@
   {
    "fieldname": "calin_customer_id",
    "fieldtype": "Data",
-   "label": "Calin Customer ID"
+   "label": "Calin Customer ID",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "in_global_search": 1
   },
   {
    "fieldname": "meter_type",
@@ -127,7 +133,8 @@
   {
    "fieldname": "customer_name",
    "fieldtype": "Data",
-   "label": "Customer Name"
+   "label": "Customer Name",
+   "in_global_search": 1
   },
   {
    "fieldname": "created_date",
@@ -148,7 +155,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-15 09:20:37.007746",
+ "modified": "2026-11-23 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Upande Hydrax",
  "name": "Water Meter",
@@ -170,6 +177,8 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "search_fields": "house_number,calin_customer_id,customer_name",
+ "show_title_field_in_link": 0,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],

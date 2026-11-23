@@ -109,6 +109,28 @@ def sync_all_dcus():
     frappe.msgprint(f"DCU sync complete: {created} created, {updated} updated")
 
 
+def ensure_house(customer_id, site=None):
+    """Return the House whose number is this Calin customer ID, creating it if
+    needed. Returns None when the meter has no customer ID."""
+    house_number = (customer_id or "").strip()
+    if not house_number:
+        return None
+
+    existing = frappe.db.get_value("House", {"house_number": house_number}, "name")
+    if existing:
+        return existing
+
+    house = frappe.get_doc({
+        "doctype": "House",
+        "house_number": house_number,
+        "calin_customer_id": house_number,
+        "site": site,
+        "status": "Active",
+    })
+    house.insert(ignore_permissions=True)
+    return house.name
+
+
 @frappe.whitelist()
 def sync_all_water_meters():
     settings = frappe.get_single("URL Setup Settings")
@@ -149,7 +171,14 @@ def sync_all_water_meters():
             "dcu": dcu_link
         }
 
-        if not frappe.db.exists("Water Meter", meter_id):
+        exists = frappe.db.exists("Water Meter", meter_id)
+
+        # Staff look meters up by house (VV034, Yamin26), which is the Calin
+        # customer ID; keep a house someone assigned by hand
+        if not (exists and frappe.db.get_value("Water Meter", meter_id, "house_number")):
+            fields["house_number"] = ensure_house(row.get("customerId"), row.get("site"))
+
+        if not exists:
             fields["doctype"] = "Water Meter"
             fields["meter_id"] = meter_id
             doc = frappe.get_doc(fields)
