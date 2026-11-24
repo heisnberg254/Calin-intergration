@@ -20,6 +20,7 @@ class TokenRecord(Document):
 		customer_id: DF.Data | None
 		customer_name: DF.Data | None
 		debt_remaining: DF.Currency
+		house: DF.Link | None
 		is_preview: DF.Check
 		meter: DF.Link | None
 		mpesa_receipt_number: DF.Data | None

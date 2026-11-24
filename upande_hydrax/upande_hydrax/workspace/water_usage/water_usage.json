@@ -1,0 +1,39 @@
+{
+ "app": "upande_hydrax",
+ "charts": [],
+ "content": "[{\"id\":\"hxu-block\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Water Usage\",\"col\":12}}]",
+ "custom_blocks": [
+  {
+   "custom_block_name": "Water Usage",
+   "label": "Water Usage"
+  }
+ ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "external_link": null,
+ "for_user": null,
+ "hide_custom": 0,
+ "icon": "droplet",
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Water Usage",
+ "link_to": null,
+ "link_type": "DocType",
+ "links": [],
+ "modified": "2026-11-24 12:00:00.000000",
+ "module": "Upande Hydrax",
+ "module_onboarding": null,
+ "name": "Water Usage",
+ "number_cards": [],
+ "parent_page": "Upande Calin Integration",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": null,
+ "roles": [],
+ "sequence_id": 2,
+ "shortcuts": [],
+ "sidebar_items": [],
+ "standard": 0,
+ "title": "Water Usage",
+ "type": "Workspace"
+}

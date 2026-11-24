@@ -332,6 +332,6 @@ override_whitelisted_methods = {
 }
 
 fixtures = [
-    {"doctype": "Custom HTML Block", "filters": [["name", "in", ["Upande Sensors"]]]},
+    {"doctype": "Custom HTML Block", "filters": [["name", "in", ["Upande Sensors", "Water Usage"]]]},
     {"doctype": "Client Script", "filters": [["dt", "in", ["DCU", "Token Record", "Water Meter", "Meter Reading"]]]}
 ]

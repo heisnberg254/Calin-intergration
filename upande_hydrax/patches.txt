@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 upande_hydrax.patches.link_water_meters_to_houses
 upande_hydrax.patches.backfill_daily_water_consumption
+upande_hydrax.patches.fill_token_record_house
